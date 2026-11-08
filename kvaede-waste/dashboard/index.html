@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kvaede Waste Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --page: #fcfbf7; --ink: #1c1c1a; --ink-soft: #5d5c57; --rule: #1c1c1a; --node: #ffffff; --shadow: #1c1c1a;
+  --grid: #e4e1d8; --bar: #c9c5b9; --hot: #e0610e; --chain: #2f62d4;
+  --src-h: #8ccbe8; --src-b: #eef7fc; --sem-h: #3bb7a3; --sem-b: #e6f5ef; --qa-h: #e3ea6b; --qa-b: #f9fbe1;
+  --wh-h: #f6d9a6; --wh-b: #fdf3e1;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #17181a; --ink: #ecebe6; --ink-soft: #a3a29b; --rule: #ecebe6; --node: #232427; --shadow: #000;
+    --grid: #34353a; --bar: #55565c; --hot: #ff9a52; --chain: #7aa2ff;
+    --src-h: #3f7f9c; --src-b: #1c2429; --sem-h: #24806f; --sem-b: #1a2522; --qa-h: #868b2e; --qa-b: #24251a;
+    --wh-h: #9a7a43; --wh-b: #26221b;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 var(--sans); padding: 28px 20px 40px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 32px; }
+h1 { font: 600 22px var(--mono); letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+.sub { color: var(--ink-soft); margin: 4px 0 0; max-width: 68ch; }
+.status { font: 12px var(--mono); border: 1px solid var(--rule); background: var(--node); padding: 4px 10px; }
+.status.err { border-color: var(--hot); color: var(--hot); }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi .v { font-size: 19px; } }
+.kpi { border: 1.5px solid var(--rule); background: var(--node); box-shadow: 4px 4px 0 var(--shadow); padding: 12px 14px; min-width: 0; }
+.kpi .l { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.kpi .v { font: 600 26px var(--mono); margin-top: 4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi .v.hot { color: var(--hot); }
+.kpi .n { font-size: 12.5px; color: var(--ink-soft); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { border: 1.5px solid var(--rule); box-shadow: 5px 5px 0 var(--shadow); display: flex; flex-direction: column; min-width: 0; }
+.panel > h2 { margin: 0; font: 500 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; text-align: center;
+  padding: 9px 12px; border-bottom: 1.5px solid var(--rule); }
+.panel .body { padding: 14px 16px 12px; flex: 1; min-width: 0; }
+.panel .foot { font: 11px var(--mono); color: var(--ink-soft); padding: 0 16px 12px; }
+.p-store { background: var(--sem-b); } .p-store > h2 { background: var(--sem-h); }
+.p-ing   { background: var(--qa-b); }  .p-ing > h2   { background: var(--qa-h); }
+.p-trend { background: var(--src-b); grid-column: 1 / -1; } .p-trend > h2 { background: var(--src-h); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 18px; vertical-align: middle; margin-right: 5px; }
+.legend .sw { height: 10px; border: 1px solid var(--rule); }
+.legend .ln { border-top: 2px dashed var(--chain); }
+.legend .ln.solid { border-top-style: solid; }
+
+svg { display: block; width: 100%; overflow: visible; }
+svg text { fill: var(--ink); font: 12px var(--sans); }
+svg .tick text, svg .val { font: 11px var(--mono); fill: var(--ink-soft); font-variant-numeric: tabular-nums; }
+svg .domain { display: none; }
+/* halo so the average line doesn't cut through the labels */
+svg .val { paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.p-store svg .val { stroke: var(--sem-b); } .p-ing svg .val { stroke: var(--qa-b); }
+svg .tick line { stroke: var(--grid); }
+.bar { fill: var(--bar); stroke: var(--rule); stroke-width: 1; }
+.bar.above { fill: var(--hot); }
+.row { cursor: pointer; }
+.row:hover .bar { stroke-width: 2; }
+.row.sel .lbl { font-weight: 600; }
+.row.sel .bar { stroke-width: 2.5; }
+.row:focus-visible { outline: none; }
+.row:focus-visible .bar { stroke: var(--chain); stroke-width: 3; }
+.avg { stroke: var(--chain); stroke-width: 2; stroke-dasharray: 5 4; }
+.avg-lbl { font: 11px var(--mono); fill: var(--chain); }
+.mark { stroke: var(--chain); stroke-width: 2.5; }
+.line { fill: none; stroke-width: 2.5; }
+.line.chain { stroke: var(--chain); stroke-dasharray: 5 4; }
+.line.store { stroke: var(--hot); }
+.dot { fill: var(--hot); stroke: var(--page); stroke-width: 1.5; }
+.hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 6px; }
+footer { font: 11.5px var(--mono); color: var(--ink-soft); }
+.tip { position: fixed; z-index: 20; pointer-events: none; max-width: 280px; background: var(--node); color: var(--ink);
+  border: 1.5px solid var(--rule); box-shadow: 3px 3px 0 var(--shadow); padding: 8px 10px; font-size: 12.5px; line-height: 1.4; }
+.tip .t { font: 600 12.5px var(--mono); margin-bottom: 4px; }
+.tip .r { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+.tip .r span:last-child { font-family: var(--mono); }
+.tip .hot { color: var(--hot); }
+.tip .note { color: var(--ink-soft); margin-top: 4px; font-size: 12px; }
+.kpi[data-tip] { cursor: help; }
+.hover-rule { stroke: var(--ink-soft); stroke-width: 1; stroke-dasharray: 2 3; }
+.hover-dot.chain { fill: var(--chain); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Kvaede Waste</h1>
+      <p class="sub">How much of what each bar uses ends up in the bin, Nov 2025 – Oct 2026. Waste % = value of registered waste ÷ value of ingredients used in items sold.</p>
+    </div>
+    <span class="status" id="status">Connecting to Cube…</span>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="grid">
+    <section class="panel p-store">
+      <h2>Waste by store</h2>
+      <div class="body">
+        <div class="legend"><span><i class="sw" style="background:var(--hot)"></i>above chain average</span><span><i class="sw" style="background:var(--bar)"></i>at or below</span><span><i class="ln"></i>chain average</span></div>
+        <p class="hint">Click a store to see its ingredients and trend.</p>
+        <div id="stores"></div>
+      </div>
+    </section>
+    <section class="panel p-ing">
+      <h2 id="ing-title">Ingredients</h2>
+      <div class="body">
+        <div class="legend"><span><i class="sw" style="background:var(--hot)"></i>this store, above chain</span><span><i class="sw" style="background:var(--bar)"></i>this store</span><span><i class="ln solid"></i>chain average for the ingredient</span></div>
+        <div id="ingredients"></div>
+      </div>
+    </section>
+    <section class="panel p-trend">
+      <h2 id="trend-title">Monthly trend</h2>
+      <div class="body">
+        <div class="legend"><span><i class="ln solid" style="border-color:var(--hot)"></i><span id="trend-store">store</span></span><span><i class="ln"></i>chain</span></div>
+        <div id="trend"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+
+  <footer>Data: Cube REST API → cube <b>ingredient_waste</b> → SQLMesh mart <b>marts.fct_ingredient_daily</b> in MotherDuck. All names and figures are invented.</footer>
+</div>
+
+<script>
+const CUBE = "http://localhost:4000/cubejs-api/v1/load";
+const C = "ingredient_waste";
+
+async function cube(query) {
+  // Cube says "Continue wait" while a query is still running, so I ask again
+  for (let i = 0; i < 30; i++) {
+    const res = await fetch(CUBE + "?query=" + encodeURIComponent(JSON.stringify(query)));
+    const json = await res.json();
+    if (json.error === "Continue wait") { await new Promise(r => setTimeout(r, 500)); continue; }
+    if (json.error) throw new Error(json.error);
+    return json.data.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => {
+      const key = k.replace(C + ".", "");
+      return [key, v !== null && v !== "" && !isNaN(v) ? +v : v];
+    })));
+  }
+  throw new Error("Cube did not answer in time");
+}
+const M = ["waste_pct", "wasted_value", "used_value"].map(m => `${C}.${m}`);
+const month = { dimension: `${C}.date`, granularity: "month" };
+
+let D = {}, selected = null;
+const pct = v => v.toFixed(1) + "%";
+const dkk = v => d3.format(",.0f")(v).replace(/,/g, ".") + " kr";
+const pts = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + " pts";
+
+const tipEl = document.getElementById("tip");
+function placeTip(x, y) {
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.min(x + 14, innerWidth - w - 8) + "px";
+  tipEl.style.top = (y + 14 + h > innerHeight ? y - h - 10 : y + 14) + "px";
+}
+function showTip(e, html) {
+  tipEl.innerHTML = html; tipEl.hidden = false;
+  if (e.clientX != null) placeTip(e.clientX, e.clientY);
+  else { const r = e.currentTarget.getBoundingClientRect(); placeTip(r.left + r.width / 2, r.bottom - 10); }
+}
+const hideTip = () => { tipEl.hidden = true; };
+const row = (a, b, cls = "") => `<div class="r"><span>${a}</span><span class="${cls}">${b}</span></div>`;
+
+function hbars(el, rows, { label, value, avg, avgOf, onClick, sel, tip }) {
+  const box = d3.select(el); box.selectAll("*").remove();
+  const W = el.clientWidth, rowH = 26, m = { t: 22, r: 52, b: 8, l: 120 };
+  const H = m.t + rows.length * rowH + m.b;
+  const max = d3.max(rows, r => Math.max(value(r), avgOf ? avgOf(r) : avg)) * 1.08;
+  const x = d3.scaleLinear([0, max], [m.l, W - m.r]);
+  const y = d3.scaleBand(rows.map(label), [m.t, H - m.b]).padding(0.25);
+  const svg = box.append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
+
+  svg.append("g").attr("transform", `translate(0,${m.t})`)
+    .call(d3.axisTop(x).ticks(Math.max(2, Math.floor(W / 110))).tickFormat(d => d + "%").tickSize(-(H - m.t - m.b)));
+
+  const g = svg.selectAll(".row").data(rows).join("g")
+    .attr("class", r => "row" + (sel && sel(r) ? " sel" : ""))
+    .attr("transform", r => `translate(0,${y(label(r))})`);
+  if (onClick) g.attr("tabindex", 0).attr("role", "button").attr("aria-label", r => `${label(r)}: ${pct(value(r))}`)
+    .on("click", (e, r) => onClick(r)).on("keydown", (e, r) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(r); } });
+  else g.style("cursor", "default").attr("tabindex", 0);
+  g.on("pointermove", (e, r) => showTip(e, tip(r))).on("pointerleave", hideTip)
+    .on("focus", (e, r) => showTip(e, tip(r))).on("blur", hideTip);
+
+  g.append("text").attr("class", "lbl").attr("x", m.l - 8).attr("y", y.bandwidth() / 2).attr("dy", "0.35em")
+    .attr("text-anchor", "end").text(label);
+  g.append("rect").attr("class", r => "bar" + (value(r) > (avgOf ? avgOf(r) : avg) + 0.05 ? " above" : ""))
+    .attr("x", m.l).attr("height", y.bandwidth()).attr("width", r => x(value(r)) - m.l);
+  g.append("text").attr("class", "val").attr("x", r => x(value(r)) + 5).attr("y", y.bandwidth() / 2).attr("dy", "0.35em").text(r => pct(value(r)));
+
+  if (avgOf) {
+    g.append("line").attr("class", "mark").attr("x1", r => x(avgOf(r))).attr("x2", r => x(avgOf(r))).attr("y1", -3).attr("y2", y.bandwidth() + 3);
+  } else {
+    svg.append("line").attr("class", "avg").attr("x1", x(avg)).attr("x2", x(avg)).attr("y1", m.t).attr("y2", H - m.b);
+    svg.append("text").attr("class", "avg-lbl").attr("x", x(avg) + 4).attr("y", H - m.b - 4).text("chain " + pct(avg));
+  }
+}
+
+function trend(el, chain, store) {
+  const box = d3.select(el); box.selectAll("*").remove();
+  const W = el.clientWidth, H = 240, m = { t: 12, r: 16, b: 26, l: 40 };
+  const x = d3.scaleUtc(d3.extent(chain, d => d.date), [m.l, W - m.r]);
+  const all = chain.concat(store).map(d => d.waste_pct);
+  const y = d3.scaleLinear([Math.floor(d3.min(all) - 0.5), Math.ceil(d3.max(all) + 0.5)], [H - m.b, m.t]).nice();
+  const svg = box.append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("height", H);
+  svg.append("g").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.max(3, Math.floor(W / 90))).tickFormat(d3.utcFormat("%b %y")).tickSize(0)).selectAll("text").attr("dy", "1.2em");
+  svg.append("g").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d => d + "%").tickSize(-(W - m.l - m.r)))
+    .call(g => g.selectAll(".tick").filter(d => d === y.domain()[0]).select("text").remove());
+  const line = d3.line(d => x(d.date), d => y(d.waste_pct)).curve(d3.curveMonotoneX);
+  svg.append("path").attr("class", "line chain").attr("d", line(chain));
+  svg.append("path").attr("class", "line store").attr("d", line(store));
+  const last = store[store.length - 1];
+  svg.append("circle").attr("class", "dot").attr("r", 4.5).attr("cx", x(last.date)).attr("cy", y(last.waste_pct));
+
+  const rule = svg.append("line").attr("class", "hover-rule").attr("y1", m.t).attr("y2", H - m.b).style("display", "none");
+  const dots = svg.selectAll(".hover-dot").data(["store", "chain"]).join("circle")
+    .attr("class", d => "dot hover-dot " + d).attr("r", 4).style("display", "none");
+  const nearest = px => { const i = d3.bisectCenter(chain.map(d => +d.date), +x.invert(px)); return [chain[i], store[i]]; };
+  svg.append("rect").attr("x", m.l).attr("y", m.t).attr("width", W - m.l - m.r).attr("height", H - m.t - m.b)
+    .attr("fill", "transparent")
+    .on("pointermove", e => {
+      const [c, s] = nearest(d3.pointer(e)[0]);
+      if (!c || !s) return;
+      rule.style("display", null).attr("x1", x(c.date)).attr("x2", x(c.date));
+      dots.style("display", null).attr("cx", x(c.date)).attr("cy", d => y(d === "store" ? s.waste_pct : c.waste_pct));
+      showTip(e, `<div class="t">${d3.utcFormat("%B %Y")(c.date)}</div>`
+        + row(s.store_name, pct(s.waste_pct), s.waste_pct > c.waste_pct ? "hot" : "")
+        + row("Chain", pct(c.waste_pct))
+        + row("Wasted", dkk(s.wasted_value)));
+    })
+    .on("pointerleave", () => { rule.style("display", "none"); dots.style("display", "none"); hideTip(); });
+}
+
+function kpis() {
+  const t = D.total, worst = D.stores[0], hot = D.hotspot;
+  const box = document.getElementById("kpis");
+  box.innerHTML = [
+    ["Chain waste", pct(t.waste_pct), `${dkk(t.wasted_value)} of ${dkk(t.used_value)} used`, false,
+      "Value of everything registered as waste ÷ value of the ingredients that went into items sold, across all 10 stores."],
+    ["Wasted value", dkk(t.wasted_value), "12 months, 10 stores", false,
+      "Registered waste valued at each ingredient's cost price."],
+    ["Worst store", worst.store_name, `${pct(worst.waste_pct)} vs chain ${pct(t.waste_pct)}`, false,
+      `The store with the highest waste %: ${pts(worst.waste_pct - t.waste_pct)} above the chain.`],
+    ["Biggest hotspot", hot.ingredient_name, `${hot.store_name}: ${pct(hot.waste_pct)} vs chain ${pct(D.ingChain.get(hot.ingredient_name))}`, true,
+      `The store × ingredient that wastes the most money above that ingredient's chain rate: ${dkk(hot.excess)} more than if it wasted at the chain rate.`],
+  ].map(([l, v, n, h, tip]) => `<div class="kpi" tabindex="0" data-tip="${tip}"><div class="l">${l}</div><div class="v${h ? " hot" : ""}">${v}</div><div class="n">${n}</div></div>`).join("");
+  box.querySelectorAll(".kpi").forEach(k => {
+    const html = () => `<div class="note" style="margin:0">${k.dataset.tip}</div>`;
+    k.addEventListener("pointermove", e => showTip(e, html()));
+    k.addEventListener("pointerleave", hideTip);
+    k.addEventListener("focus", e => showTip(e, html()));
+    k.addEventListener("blur", hideTip);
+  });
+}
+
+function render() {
+  if (!D.stores) return;
+  hbars(document.getElementById("stores"), D.stores, {
+    label: r => r.store_name, value: r => r.waste_pct, avg: D.total.waste_pct,
+    sel: r => r.store_name === selected, onClick: r => { selected = r.store_name; render(); },
+    tip: r => {
+      const diff = r.waste_pct - D.total.waste_pct;
+      return `<div class="t">${r.store_name}</div>`
+        + row("Waste", pct(r.waste_pct), diff > 0.05 ? "hot" : "")
+        + row("Chain", pct(D.total.waste_pct))
+        + row("Wasted", dkk(r.wasted_value))
+        + row("Used", dkk(r.used_value))
+        + `<div class="note">${pts(diff)} vs chain · click to see its ingredients</div>`;
+    },
+  });
+  const ing = D.storeIng.filter(r => r.store_name === selected).sort((a, b) => b.waste_pct - a.waste_pct);
+  document.getElementById("ing-title").textContent = "Ingredients · " + selected;
+  hbars(document.getElementById("ingredients"), ing, {
+    label: r => r.ingredient_name, value: r => r.waste_pct, avgOf: r => D.ingChain.get(r.ingredient_name),
+    tip: r => {
+      const chain = D.ingChain.get(r.ingredient_name), extra = r.wasted_value - r.used_value * chain / 100;
+      return `<div class="t">${r.ingredient_name} · ${r.store_name}</div>`
+        + row("This store", pct(r.waste_pct), r.waste_pct > chain + 0.05 ? "hot" : "")
+        + row("Chain", pct(chain))
+        + row("Wasted", dkk(r.wasted_value))
+        + `<div class="note">${extra > 0 ? dkk(extra) + " more than at the chain rate" : "at or below the chain rate"}</div>`;
+    },
+  });
+  document.getElementById("trend-title").textContent = "Monthly trend · " + selected;
+  document.getElementById("trend-store").textContent = selected;
+  trend(document.getElementById("trend"), D.monthChain, D.monthStore.filter(r => r.store_name === selected));
+}
+
+async function load() {
+  const status = document.getElementById("status");
+  try {
+    const t0 = performance.now();
+    const [total, stores, ingChain, storeIng, monthChain, monthStore] = await Promise.all([
+      cube({ measures: M }),
+      cube({ measures: M, dimensions: [`${C}.store_name`], order: { [`${C}.waste_pct`]: "desc" } }),
+      cube({ measures: M, dimensions: [`${C}.ingredient_name`] }),
+      cube({ measures: M, dimensions: [`${C}.store_name`, `${C}.ingredient_name`] }),
+      cube({ measures: M, timeDimensions: [month] }),
+      cube({ measures: M, dimensions: [`${C}.store_name`], timeDimensions: [month] }),
+    ]);
+    const toDate = rows => rows.map(r => ({ ...r, date: new Date(r["date.month"] + "Z") })).sort((a, b) => a.date - b.date);
+    D = {
+      total: total[0], stores, storeIng,
+      ingChain: new Map(ingChain.map(r => [r.ingredient_name, r.waste_pct])),
+      monthChain: toDate(monthChain), monthStore: toDate(monthStore),
+    };
+    // hotspot: the store x ingredient wasting the most kroner above that ingredient's chain rate
+    D.hotspot = storeIng.map(r => ({ ...r, excess: r.wasted_value - r.used_value * D.ingChain.get(r.ingredient_name) / 100 }))
+      .sort((a, b) => b.excess - a.excess)[0];
+    selected = stores[0].store_name;
+    kpis(); render();
+    status.textContent = `Live from Cube · ${Math.round(performance.now() - t0)} ms`;
+  } catch (e) {
+    status.textContent = e instanceof TypeError && /fetch/i.test(e.message)
+      ? "Cube not reachable: start it with npm run dev in the cube folder"
+      : "Error: " + e.message;
+    status.classList.add("err");
+    console.error(e);
+  }
+}
+new ResizeObserver(() => { hideTip(); render(); }).observe(document.querySelector(".wrap"));
+load();
+</script>
+</body>
+</html>

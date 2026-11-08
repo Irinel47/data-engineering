@@ -1,0 +1,56 @@
+cubes:
+  - name: ingredient_waste
+    sql_table: kvaede.marts.fct_ingredient_daily
+
+    dimensions:
+      - name: id
+        sql: "date || store_id || ingredient_id"
+        type: string
+        primary_key: true
+
+      - name: date
+        sql: date
+        type: time
+
+      - name: store_name
+        sql: store_name
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: ingredient_name
+        sql: ingredient_name
+        type: string
+
+      - name: unit
+        sql: unit
+        type: string
+
+    measures:
+      - name: used_value
+        description: Value of ingredients used in items sold (DKK)
+        sql: used_value_dkk
+        type: sum
+        format: currency
+
+      - name: wasted_value
+        description: Value of ingredients registered as waste (DKK)
+        sql: wasted_value_dkk
+        type: sum
+        format: currency
+
+      - name: waste_pct
+        description: Wasted as % of used
+        sql: "100.0 * {wasted_value} / NULLIF({used_value}, 0)"
+        type: number
+
+      - name: quantity_used
+        description: In the ingredient's unit (g, ml or pcs), so only meaningful per ingredient
+        sql: quantity_used
+        type: sum
+
+      - name: quantity_wasted
+        sql: quantity_wasted
+        type: sum

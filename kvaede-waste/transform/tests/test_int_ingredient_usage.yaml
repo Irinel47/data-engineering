@@ -1,0 +1,18 @@
+# 4 Avo Shakes + 2 Avo Toasts = 3 avocados
+test_sales_times_recipe:
+  model: intermediate.int_ingredient_usage
+  inputs:
+    staging.stg_sales:
+      rows:
+        - {sale_date: 2026-01-05, store_id: S01, menu_item_id: M01, quantity: 4}
+        - {sale_date: 2026-01-05, store_id: S01, menu_item_id: F03, quantity: 2}
+    staging.stg_recipes:
+      rows:
+        - {menu_item_id: M01, ingredient_id: I01, quantity: 0.5}
+        - {menu_item_id: M01, ingredient_id: I02, quantity: 100}
+        - {menu_item_id: F03, ingredient_id: I01, quantity: 0.5}
+  outputs:
+    query:
+      rows:
+        - {usage_date: 2026-01-05, store_id: S01, ingredient_id: I01, quantity_used: 3.0}
+        - {usage_date: 2026-01-05, store_id: S01, ingredient_id: I02, quantity_used: 400.0}

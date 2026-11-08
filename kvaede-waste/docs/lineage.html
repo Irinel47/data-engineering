@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kvaede Data Lineage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --page: #fcfbf7;
+  --ink: #1c1c1a;
+  --ink-soft: #5d5c57;
+  --rule: #1c1c1a;
+  --node: #ffffff;
+  --shadow: #1c1c1a;
+  --edge: #b9b6ac;
+  --up: #2f62d4;
+  --down: #e0610e;
+  --focus: #1c1c1a;
+  --src-h: #8ccbe8;  --src-b: #eef7fc;
+  --ing-h: #c7aff2;  --ing-b: #f5f0fe;
+  --wh-h:  #f6d9a6;  --wh-b:  #fdf3e1;
+  --tr-h:  #a8c2d8;  --tr-b:  #eef2f6;
+  --sem-h: #3bb7a3;  --sem-b: #e6f5ef;
+  --app-h: #ffe063;  --app-b: #fffbe2;
+  --orc-h: #f2968a;  --orc-b: #fdeae6;
+  --qa-h:  #e3ea6b;  --qa-b:  #f9fbe1;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #17181a; --ink: #ecebe6; --ink-soft: #a3a29b; --rule: #ecebe6; --node: #232427; --shadow: #000000;
+    --edge: #55565a; --up: #7aa2ff; --down: #ff9a52; --focus: #ecebe6;
+    --src-h: #3f7f9c; --src-b: #1c2429; --ing-h: #6c58a0; --ing-b: #221f2b; --wh-h: #9a7a43; --wh-b: #26221b;
+    --tr-h: #4f6a82; --tr-b: #1e2227; --sem-h: #24806f; --sem-b: #1a2522; --app-h: #9d8a2a; --app-b: #26251a;
+    --orc-h: #9c4d43; --orc-b: #2a1f1d; --qa-h: #868b2e; --qa-b: #24251a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #17181a; --ink: #ecebe6; --ink-soft: #a3a29b; --rule: #ecebe6; --node: #232427; --shadow: #000000;
+  --edge: #55565a; --up: #7aa2ff; --down: #ff9a52; --focus: #ecebe6;
+  --src-h: #3f7f9c; --src-b: #1c2429; --ing-h: #6c58a0; --ing-b: #221f2b; --wh-h: #9a7a43; --wh-b: #26221b;
+  --tr-h: #4f6a82; --tr-b: #1e2227; --sem-h: #24806f; --sem-b: #1a2522; --app-h: #9d8a2a; --app-b: #26251a;
+  --orc-h: #9c4d43; --orc-b: #2a1f1d; --qa-h: #868b2e; --qa-b: #24251a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--page); color: var(--ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+}
+.wrap { max-width: 1680px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 32px; }
+h1 { font-family: var(--font-mono); font-weight: 600; font-size: 22px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-soft); margin: 4px 0 0; max-width: 70ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+.stat { border: 1px solid var(--rule); background: var(--node); padding: 4px 9px; font-variant-numeric: tabular-nums; }
+.stat b { font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--ink-soft); align-items: center; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+.legend .up { border-color: var(--up); } .legend .down { border-color: var(--down); }
+.legend .planned { width: 16px; height: 12px; border: 1.5px dashed var(--rule); background: transparent; }
+.legend button { font: inherit; font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--rule); background: var(--node); color: var(--ink); padding: 3px 10px; cursor: pointer; }
+.legend button:focus-visible, .node:focus-visible, .ref:focus-visible { outline: 2px solid var(--down); outline-offset: 2px; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 980px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.board { position: relative; overflow: hidden; border: 1px solid var(--rule); background: var(--page);
+  height: clamp(420px, 68vh, 760px); cursor: grab; touch-action: none; user-select: none;
+  background-image: radial-gradient(var(--edge) 1px, transparent 1px); background-size: 22px 22px; }
+.board.dragging { cursor: grabbing; }
+.canvas { position: absolute; left: 0; top: 0; width: max-content; padding: 18px; transform-origin: 0 0; }
+.zoom { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; border: 1px solid var(--rule); background: var(--node); box-shadow: 3px 3px 0 var(--shadow); }
+.zoom button { font: 500 14px var(--font-mono); background: var(--node); color: var(--ink); border: 0; border-left: 1px solid var(--rule); min-width: 34px; height: 30px; cursor: pointer; padding: 0 10px; }
+.zoom button:first-child { border-left: 0; }
+.zoom button:hover { background: var(--wh-b); }
+.zoom button:focus-visible { outline: 2px solid var(--down); outline-offset: -2px; }
+.zoom .pct { font: 12px var(--font-mono); padding: 0 8px; display: flex; align-items: center; border-left: 1px solid var(--rule); min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
+.navhint { position: absolute; left: 12px; bottom: 12px; z-index: 5; font: 11px var(--font-mono); color: var(--ink-soft); background: var(--page); padding: 2px 6px; }
+.lanes { display: flex; gap: 44px; align-items: stretch; position: relative; z-index: 1; }
+svg.edges { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: visible; }
+
+.panel { border: 1.5px solid var(--rule); display: flex; flex-direction: column; box-shadow: 5px 5px 0 var(--shadow); }
+.panel > h2 { margin: 0; font-family: var(--font-mono); font-weight: 500; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 9px 12px; border-bottom: 1.5px solid var(--rule); }
+.panel .body { display: flex; gap: 44px; padding: 14px 16px 12px; flex: 1; }
+.panel .foot { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); padding: 0 16px 12px; max-width: 46ch; }
+.p-src  { background: var(--src-b); } .p-src > h2  { background: var(--src-h); }
+.p-ing  { background: var(--ing-b); } .p-ing > h2  { background: var(--ing-h); }
+.p-wh   { background: var(--wh-b); }  .p-wh > h2   { background: var(--wh-h); }
+.p-sem  { background: var(--sem-b); } .p-sem > h2  { background: var(--sem-h); }
+.p-app  { background: var(--app-b); } .p-app > h2  { background: var(--app-h); }
+
+.wh-inner { display: flex; gap: 44px; }
+.tr-band { display: flex; flex-direction: column; border: 1.5px solid var(--rule); background: var(--tr-b); }
+.tr-band > h3 { margin: 0; font-family: var(--font-mono); font-weight: 500; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding: 6px 10px; background: var(--tr-h); border-bottom: 1.5px solid var(--rule); }
+.tr-band .cols { display: flex; gap: 44px; padding: 12px 14px; flex: 1; }
+
+.col { display: flex; flex-direction: column; gap: 8px; width: 176px; }
+.col > .lbl { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 2px; display: flex; justify-content: space-between; }
+.col .stack { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; flex: 1; }
+
+.node {
+  all: unset; box-sizing: border-box; cursor: pointer; display: block; width: 100%;
+  background: var(--node); border: 1px solid var(--rule); padding: 6px 9px 6px;
+  transition: opacity 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.node .nm { font-family: var(--font-mono); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; line-height: 1.3; }
+.node .mt { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.node .kind { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; }
+.node.planned { border-style: dashed; background: transparent; }
+.node:hover { box-shadow: 3px 3px 0 var(--shadow); transform: translate(-1px, -1px); }
+.canvas.tracing .node { opacity: 0.28; }
+.canvas.tracing .node.on { opacity: 1; }
+.node.focus { box-shadow: 4px 4px 0 var(--focus); outline: 2px solid var(--focus); outline-offset: -1px; }
+.node.up { border-color: var(--up); box-shadow: inset 3px 0 0 var(--up); }
+.node.down { border-color: var(--down); box-shadow: inset 3px 0 0 var(--down); }
+
+path.e { fill: none; stroke: var(--edge); stroke-width: 1.2; opacity: 0.55; transition: opacity 0.15s; }
+.canvas.tracing path.e { opacity: 0.08; }
+.canvas.tracing path.e.up { stroke: var(--up); opacity: 0.95; stroke-width: 1.8; }
+.canvas.tracing path.e.down { stroke: var(--down); opacity: 0.95; stroke-width: 1.8; }
+
+.bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.strip > h2 { margin: 0; }
+.strip .body { display: block; padding: 12px 16px 14px; }
+.strip p { margin: 0; max-width: 72ch; }
+.strip code, .insp code { font-family: var(--font-mono); font-size: 12px; }
+.p-orc { background: var(--orc-b); } .p-orc > h2 { background: var(--orc-h); }
+.p-qa  { background: var(--qa-b); }  .p-qa > h2  { background: var(--qa-h); }
+
+.insp { min-width: 0; }
+.insp .body { columns: 2 320px; column-gap: 40px; }
+.insp .body > * { break-inside: avoid; }
+.insp .body { display: block; padding: 14px 16px 16px; }
+.insp .layer { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.insp h3 { font-family: var(--font-mono); font-size: 15px; font-weight: 600; margin: 2px 0 8px; overflow-wrap: anywhere; }
+.insp p { margin: 0 0 12px; }
+.insp dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 12px; font-size: 12.5px; }
+.insp dt { color: var(--ink-soft); }
+.insp dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.insp h4 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin: 12px 0 6px; font-weight: 500; }
+.insp h4 .n { color: var(--ink-soft); }
+.refs { display: flex; flex-wrap: wrap; gap: 5px; }
+.ref { all: unset; cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; border: 1px solid var(--rule); padding: 2px 6px; background: var(--node); overflow-wrap: anywhere; }
+.ref.up { border-color: var(--up); } .ref.down { border-color: var(--down); }
+.empty { color: var(--ink-soft); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { .node, path.e { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Kvaede Data Lineage</h1>
+      <p class="sub">How a sale becomes a waste number: five CSV files, loaded raw into MotherDuck, modelled and tested with SQLMesh, served by Cube to a D3 dashboard. Click any box to trace where its data comes from and where it goes. Scroll or pinch to zoom, drag to move around.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="legend">
+    <span><i class="up"></i>upstream (reads from)</span>
+    <span><i class="down"></i>downstream (feeds)</span>
+    <span style="font-family:var(--font-mono);font-size:11px">FULL = rebuilt completely on every run</span>
+    <button type="button" id="clear">Clear trace</button>
+  </div>
+
+  <div class="main">
+    <div class="board" id="board">
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button type="button" id="zout" aria-label="Zoom out">−</button>
+        <span class="pct" id="zpct">100%</span>
+        <button type="button" id="zin" aria-label="Zoom in">+</button>
+        <button type="button" id="zfit">Fit</button>
+      </div>
+      <span class="navhint">scroll or pinch to zoom · drag to move</span>
+      <div class="canvas" id="canvas">
+        <svg class="edges" id="edges" aria-hidden="true"></svg>
+        <div class="lanes" id="lanes"></div>
+      </div>
+    </div>
+    <aside class="panel insp" aria-live="polite">
+      <h2 style="background:var(--tr-h)">Inspector</h2>
+      <div class="body" id="insp"></div>
+    </aside>
+  </div>
+
+  <div class="bottom">
+    <section class="panel strip p-orc">
+      <h2>Orchestration</h2>
+      <div class="body"><p><code>sqlmesh plan</code> shows what a code change affects, runs the unit test, builds the models in dependency order and then runs the audits. All seven models are <b>full refresh</b>: with ~55k rows a full rebuild takes a few seconds. <code>sqlmesh run</code> could repeat it on a daily schedule.</p></div>
+    </section>
+    <section class="panel strip p-qa">
+      <h2>Quality</h2>
+      <div class="body" id="qa"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const META = {"models": {"staging.stg_stores": {"kind": "FULL", "grain": [], "description": "Clean copy of the store list.", "audits": ["unique_values", "not_null"], "columns": 3, "deps": ["raw.stores"], "rows": 10}, "staging.stg_ingredients": {"kind": "FULL", "grain": [], "description": "Ingredient list with unit (g, ml or pcs) and cost per unit.", "audits": ["unique_values", "accepted_values"], "columns": 4, "deps": ["raw.ingredients"], "rows": 15}, "staging.stg_waste": {"kind": "FULL", "grain": [], "description": "Waste registrations. Rows typed in kg or litres are converted to g or ml, so they match the ingredient unit.", "audits": ["forall", "assert_waste_unit_matches_ingredient"], "columns": 9, "deps": ["raw.waste", "staging.stg_ingredients"], "rows": 54551}, "staging.stg_recipes": {"kind": "FULL", "grain": [], "description": "One row per menu item \u00d7 ingredient: \"an Avo Shake uses 0.5 avocado\".", "audits": ["unique_combination_of_columns", "forall"], "columns": 6, "deps": ["raw.recipes"], "rows": 31}, "intermediate.int_ingredient_usage": {"kind": "FULL", "grain": ["(usage_date, store_id, ingredient_id)"], "description": "The core idea: items sold \u00d7 recipe = ingredients used, per store and day. 20 Avo Shakes \u00d7 0.5 = 10 avocados.", "audits": [], "columns": 4, "deps": ["staging.stg_recipes", "staging.stg_sales"], "rows": 54750}, "staging.stg_sales": {"kind": "FULL", "grain": [], "description": "Items sold per store per day, with proper types.", "audits": ["unique_combination_of_columns", "forall"], "columns": 4, "deps": ["raw.sales"], "rows": 43800}, "marts.fct_ingredient_daily": {"kind": "FULL", "grain": ["(date, store_id, ingredient_id)"], "description": "Used and wasted per store, ingredient and day, in units and in DKK. The only table the dashboard reads (through Cube).", "audits": ["unique_combination_of_columns"], "columns": 11, "deps": ["intermediate.int_ingredient_usage", "staging.stg_ingredients", "staging.stg_stores", "staging.stg_waste"], "rows": 54750}}, "raw": {"raw.stores": 10, "raw.ingredients": 15, "raw.recipes": 31, "raw.sales": 43800, "raw.waste": 54551}, "n_audits": 11};
+
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n.toLocaleString('en');
+const KIND = { INCREMENTAL_BY_TIME_RANGE: 'INCR', FULL: 'FULL', VIEW: 'VIEW' };
+
+const N = {};
+const add = (id, o) => (N[id] = Object.assign({ id, deps: [] }, o));
+
+const SOURCES = [
+  ['stores', 'stores.csv', 'The 10 bars: id, name, city.', ['stores']],
+  ['ingredients', 'ingredients.csv', 'What the chain buys: unit (g, ml or pcs) and cost per unit in DKK.', ['ingredients']],
+  ['recipes', 'recipes.csv', 'Which ingredients go into each of the 12 menu items, and how much.', ['recipes']],
+  ['sales', 'sales.csv', 'How many of each menu item each bar sold per day.', ['sales']],
+  ['waste', 'waste.csv', 'What staff registered as thrown away. About 8% of rows were typed in kg or litres by mistake.', ['waste']],
+];
+const VIA = {};
+SOURCES.forEach(([k, label, desc]) => add('src.' + k, { label, layer: 'Source file', desc, meta: 'generate_data.py', via: 'read_csv' }));
+add('ing.csv', { label: 'read_csv', layer: 'Ingestion', desc: 'DuckDB reads each CSV file and creates one table per file in the raw schema, unchanged.', meta: 'load_to_motherduck.py' });
+Object.entries(META.raw).forEach(([id, rows]) => add(id, { label: id.slice(4), layer: 'MotherDuck · raw', rows, desc: 'The CSV file loaded as-is. Nothing is cleaned here, so everything after it can always be rebuilt.' }));
+SOURCES.forEach(([k, , , tables]) => tables.forEach(t => { N['raw.' + t].deps.push('src.' + k); VIA['src.' + k + '>raw.' + t] = 'ing.csv'; }));
+Object.entries(META.models).forEach(([id, m]) => add(id, {
+  label: id.split('.')[1], layer: 'SQLMesh · ' + id.split('.')[0], rows: m.rows, kind: KIND[m.kind] || m.kind,
+  desc: m.description, deps: m.deps.slice(), model: m,
+}));
+const CUBES = [['ingredient_waste', 'marts.fct_ingredient_daily', 'Measures: used_value, wasted_value (DKK) and waste_pct = wasted ÷ used × 100. Dimensions: date, store, city, ingredient. Defined once, used by every chart.']];
+CUBES.forEach(([k, src, desc]) => add('cube.' + k, { label: k, layer: 'Cube · cube', desc, deps: [src], meta: 'REST API' }));
+const DASH = [
+  ['kpi', 'KPI tiles', 'Chain waste %, wasted value, worst store and the biggest store × ingredient hotspot.'],
+  ['stores', 'Waste by store', 'Each store against the chain average. Click a store to select it.'],
+  ['ingredients', 'Ingredients', 'The selected store per ingredient, with the chain average for each ingredient.'],
+  ['trend', 'Monthly trend', 'The selected store against the chain, month by month.'],
+];
+DASH.forEach(([k, label, desc]) => add('dash.' + k, { label, layer: 'D3.js dashboard', desc, deps: ['cube.ingredient_waste'], meta: 'index.html' }));
+
+const order = {
+  raw: ['stores', 'ingredients', 'recipes', 'sales', 'waste'].map(x => 'raw.' + x),
+  staging: ['stg_stores', 'stg_ingredients', 'stg_recipes', 'stg_sales', 'stg_waste'].map(x => 'staging.' + x),
+  intermediate: ['intermediate.int_ingredient_usage'],
+  marts: ['marts.fct_ingredient_daily'],
+};
+const COLS = {};
+
+function col(label, ids, idx) {
+  const c = document.createElement('div');
+  c.className = 'col';
+  c.innerHTML = `<div class="lbl"><span>${label}</span><span>${ids.length}</span></div><div class="stack"></div>`;
+  const st = c.querySelector('.stack');
+  ids.forEach(id => {
+    const n = N[id]; COLS[id] = idx;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'node'; b.dataset.id = id;
+    const right = n.rows != null ? fmt(n.rows) + ' rows' : (n.meta || '');
+    b.innerHTML = `<div class="nm">${n.label}</div><div class="mt"><span class="kind">${n.kind || ''}</span><span>${right}</span></div>`;
+    b.setAttribute('aria-label', `${n.label}, ${n.layer}`);
+    st.appendChild(b);
+  });
+  return c;
+}
+function panel(cls, title, foot) {
+  const p = document.createElement('section');
+  p.className = 'panel ' + cls;
+  p.innerHTML = `<h2>${title}</h2><div class="body"></div>` + (foot ? `<div class="foot">${foot}</div>` : '');
+  return p;
+}
+
+const lanes = document.getElementById('lanes');
+let ci = 0;
+const pSrc = panel('p-src', 'Sources', 'generate_data.py · 10 bars · 12 months');
+pSrc.querySelector('.body').append(col('csv files', SOURCES.map(s => 'src.' + s[0]), ci++));
+const pIng = panel('p-ing', 'Ingestion', 'load_to_motherduck.py');
+pIng.querySelector('.body').append(col('reader', ['ing.csv'], ci++));
+const pWh = panel('p-wh', 'MotherDuck · kvaede', 'Raw tables and every model live in the same cloud database.');
+const whInner = document.createElement('div'); whInner.className = 'wh-inner';
+whInner.append(col('raw', order.raw, ci++));
+const band = document.createElement('div'); band.className = 'tr-band';
+band.innerHTML = '<h3>Transformation · SQLMesh</h3><div class="cols"></div>';
+band.querySelector('.cols').append(col('staging', order.staging, ci++), col('intermediate', order.intermediate, ci++), col('marts', order.marts, ci++));
+whInner.append(band);
+pWh.querySelector('.body').append(whInner);
+const pSem = panel('p-sem', 'Semantic layer · Cube', 'Metrics defined once.');
+pSem.querySelector('.body').append(col('cube', CUBES.map(c => 'cube.' + c[0]), ci++));
+const pApp = panel('p-app', 'Dashboard · D3.js', 'dashboard/index.html');
+pApp.querySelector('.body').append(col('panels', DASH.map(d => 'dash.' + d[0]), ci++));
+lanes.append(pSrc, pIng, pWh, pSem, pApp);
+
+const EDGES = [];
+Object.values(N).forEach(n => n.deps.forEach(d => { if (N[d]) EDGES.push({ from: d, to: n.id }); }));
+const ups = {}, downs = {};
+EDGES.forEach(e => { (ups[e.to] ||= []).push(e.from); (downs[e.from] ||= []).push(e.to); });
+function walk(start, adj) {
+  const seen = new Set(), q = [start];
+  while (q.length) { const x = q.shift(); (adj[x] || []).forEach(y => { if (!seen.has(y)) { seen.add(y); q.push(y); } }); }
+  return seen;
+}
+
+const svg = document.getElementById('edges');
+const canvas = document.getElementById('canvas');
+const NS = 'http://www.w3.org/2000/svg';
+const el = id => canvas.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+let SEGS = [];
+const view = { k: 1, x: 0, y: 0 };  // zoom and pan
+function box(id) {
+  const r = el(id).getBoundingClientRect(), c = canvas.getBoundingClientRect();
+  return { l: (r.left - c.left) / view.k, r: (r.right - c.left) / view.k, y: (r.top - c.top + r.height / 2) / view.k };
+}
+function curve(a, b, sameCol) {
+  if (sameCol) {
+    const x = a.r, k = 26 + Math.min(40, Math.abs(b.y - a.y) / 8);
+    return `M${x},${a.y} C${x + k},${a.y} ${x + k},${b.y} ${x},${b.y}`;
+  }
+  const dx = Math.max(28, (b.l - a.r) * 0.5);
+  return `M${a.r},${a.y} C${a.r + dx},${a.y} ${b.l - dx},${b.y} ${b.l},${b.y}`;
+}
+function draw() {
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  svg.setAttribute('width', w); svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = '';
+  SEGS = [];
+  EDGES.forEach(e => {
+    const key = e.from + '>' + e.to;
+    const hops = VIA[key] ? [e.from, VIA[key], e.to] : [e.from, e.to];
+    for (let i = 0; i < hops.length - 1; i++) {
+      const a = box(hops[i]), b = box(hops[i + 1]);
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', curve(a, b, COLS[hops[i]] === COLS[hops[i + 1]]));
+      p.setAttribute('class', 'e');
+      svg.appendChild(p);
+      SEGS.push({ p, key, from: e.from, to: e.to });
+    }
+  });
+  paint();
+}
+
+let pinned = 'src.sales', hover = null;
+function paint() {
+  const id = hover || pinned;
+  canvas.classList.toggle('tracing', !!id);
+  const up = id ? walk(id, ups) : new Set(), down = id ? walk(id, downs) : new Set();
+  canvas.querySelectorAll('.node').forEach(b => {
+    const x = b.dataset.id;
+    b.classList.toggle('focus', x === id);
+    b.classList.toggle('up', up.has(x));
+    b.classList.toggle('down', down.has(x));
+    b.classList.toggle('on', x === id || up.has(x) || down.has(x));
+  });
+  SEGS.forEach(s => {
+    const isUp = id && (s.to === id || up.has(s.to)) && up.has(s.from);
+    const isDown = id && (s.from === id || down.has(s.from)) && down.has(s.to);
+    s.p.classList.toggle('up', !!isUp);
+    s.p.classList.toggle('down', !!isDown && !isUp);
+    if ((isUp || isDown) && VIA[s.key]) { const r = el(VIA[s.key]); r.classList.add('on', isUp ? 'up' : 'down'); }
+  });
+  inspect(id, up, down);
+}
+function refs(ids, cls) {
+  return ids.length ? `<div class="refs">${ids.map(x => `<button type="button" class="ref ${cls}" data-go="${x}">${N[x].label}</button>`).join('')}</div>` : '<div class="empty">none</div>';
+}
+function inspect(id, up, down) {
+  const box = document.getElementById('insp');
+  if (!id) { box.innerHTML = '<p class="empty">Click a box on the board to see what it is, what it reads from and what depends on it.</p>'; return; }
+  const n = N[id], m = n.model;
+  const facts = [];
+  if (n.kind) facts.push(['Kind', m.kind.replace(/_/g, ' ').toLowerCase()]);
+  if (m && m.grain.length) facts.push(['Grain', m.grain.join(', ')]);
+  if (n.rows != null) facts.push(['Rows', n.rows.toLocaleString('en')]);
+  if (m) facts.push(['Columns', m.columns]);
+  if (m && m.audits.length) facts.push(['Audits', m.audits.join(', ')]);
+  if (n.id.startsWith('raw.')) facts.push(['Table', 'kvaede.' + n.id]);
+  if (n.via) facts.push(['Loaded with', n.via]);
+  const direct = { up: ups[id] || [], down: downs[id] || [] };
+  box.innerHTML = `
+    <div class="layer">${n.layer}</div>
+    <h3>${n.label}</h3>
+    ${n.desc ? `<p>${n.desc}</p>` : ''}
+    ${facts.length ? `<dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
+    <h4>Reads from <span class="n">${direct.up.length} direct · ${up.size} total</span></h4>${refs(direct.up, 'up')}
+    <h4>Feeds <span class="n">${direct.down.length} direct · ${down.size} total</span></h4>${refs(direct.down, 'down')}`;
+}
+
+canvas.addEventListener('mouseover', e => { const b = e.target.closest('.node'); if (b && matchMedia('(hover: hover)').matches) { hover = b.dataset.id; paint(); } });
+canvas.addEventListener('mouseleave', () => { hover = null; paint(); });
+canvas.addEventListener('mouseout', e => { if (!e.relatedTarget || !e.relatedTarget.closest('.node')) { if (hover) { hover = null; paint(); } } });
+canvas.addEventListener('click', e => { if (moved) return; const b = e.target.closest('.node'); if (b) { pinned = pinned === b.dataset.id ? null : b.dataset.id; hover = null; paint(); } });
+document.getElementById('insp').addEventListener('click', e => {
+  const r = e.target.closest('[data-go]'); if (!r) return;
+  pinned = r.dataset.go; hover = null; paint();
+  centerOn(pinned);
+});
+document.getElementById('clear').addEventListener('click', () => { pinned = null; hover = null; paint(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { pinned = null; hover = null; paint(); } });
+
+const models = Object.values(META.models);
+document.getElementById('stats').innerHTML = [
+  [SOURCES.length, 'CSV files'], [Object.keys(META.raw).length, 'raw tables'], [models.length, 'SQLMesh models'],
+  [META.n_audits, 'audits'], [1, 'unit test'], [CUBES.length, 'cube'], [DASH.length, 'dashboard panels'],
+].map(([v, l]) => `<span class="stat"><b>${v}</b> ${l}</span>`).join('');
+document.getElementById('qa').innerHTML = `<p><b>${META.n_audits} audits</b> run after every build and stop the run if any fails: unique keys, positive quantities, units from a known list, and <code>assert_waste_unit_matches_ingredient</code> (no kg or litres left after the conversion in <code>stg_waste</code>). <b>1 unit test</b> checks the core logic on made-up rows: 4 Avo Shakes + 2 Avo Toasts must equal 3 avocados.</p>`;
+
+const ro = new ResizeObserver(() => draw());
+ro.observe(canvas);
+const board = document.getElementById('board');
+const MIN = 0.25, MAX = 2.5;
+function apply() {
+  canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+  document.getElementById('zpct').textContent = Math.round(view.k * 100) + '%';
+}
+function zoomAt(k, px, py) {  // keeps the point under the cursor still
+  k = Math.min(MAX, Math.max(MIN, k));
+  view.x = px - (px - view.x) * (k / view.k);
+  view.y = py - (py - view.y) * (k / view.k);
+  view.k = k; apply();
+}
+function fit() {
+  const k = Math.min(1.2, board.clientWidth / canvas.offsetWidth, board.clientHeight / canvas.offsetHeight);
+  view.k = k;
+  view.x = (board.clientWidth - canvas.offsetWidth * k) / 2;
+  view.y = (board.clientHeight - canvas.offsetHeight * k) / 2;
+  apply();
+}
+function centerOn(id) {
+  const n = el(id), b = board.getBoundingClientRect(), r = n.getBoundingClientRect();
+  view.x += b.left + b.width / 2 - (r.left + r.width / 2);
+  view.y += b.top + b.height / 2 - (r.top + r.height / 2);
+  apply();
+}
+const local = e => { const b = board.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+
+board.addEventListener('wheel', e => {
+  e.preventDefault();
+  const [px, py] = local(e);
+  zoomAt(view.k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), px, py);  // ctrlKey = trackpad pinch
+}, { passive: false });
+
+const pts = new Map();
+let moved = false, last = null, pinch = null;
+board.addEventListener('pointerdown', e => {
+  if (e.target.closest('.zoom')) return;
+  pts.set(e.pointerId, local(e));
+  if (pts.size === 1) { moved = false; last = local(e); }
+  if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k: view.k }; }
+});
+board.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return;
+  const p = local(e); pts.set(e.pointerId, p);
+  if (pts.size === 2 && pinch) {
+    const [a, b] = [...pts.values()];
+    zoomAt(pinch.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    moved = true; return;
+  }
+  const dx = p[0] - last[0], dy = p[1] - last[1];
+  if (!moved && Math.hypot(dx, dy) < 4) return;  // still a click
+  if (!moved) { moved = true; board.setPointerCapture(e.pointerId); board.classList.add('dragging'); }
+  view.x += dx; view.y += dy; last = p; apply();
+});
+const release = e => {
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch = null;
+  if (pts.size === 1) last = [...pts.values()][0];
+  if (!pts.size) { board.classList.remove('dragging'); setTimeout(() => { moved = false; }, 0); }
+};
+board.addEventListener('pointerup', release);
+board.addEventListener('pointercancel', release);
+
+const mid = () => [board.clientWidth / 2, board.clientHeight / 2];
+document.getElementById('zin').addEventListener('click', () => zoomAt(view.k * 1.25, ...mid()));
+document.getElementById('zout').addEventListener('click', () => zoomAt(view.k / 1.25, ...mid()));
+document.getElementById('zfit').addEventListener('click', fit);
+board.addEventListener('keydown', e => {
+  if (e.target.closest('.zoom')) return;
+  if (e.key === '+' || e.key === '=') zoomAt(view.k * 1.25, ...mid());
+  if (e.key === '-') zoomAt(view.k / 1.25, ...mid());
+  if (e.key === '0') fit();
+});
+
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { draw(); fit(); });
+</script>

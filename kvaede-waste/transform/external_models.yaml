@@ -1,0 +1,33 @@
+- name: '"kvaede"."raw"."ingredients"'
+  columns:
+    ingredient_id: TEXT
+    ingredient_name: TEXT
+    unit: TEXT
+    cost_per_unit_dkk: DOUBLE
+- name: '"kvaede"."raw"."recipes"'
+  columns:
+    menu_item_id: TEXT
+    menu_item_name: TEXT
+    category: TEXT
+    price_dkk: BIGINT
+    ingredient_id: TEXT
+    quantity: DOUBLE
+- name: '"kvaede"."raw"."sales"'
+  columns:
+    sale_date: DATE
+    store_id: TEXT
+    menu_item_id: TEXT
+    quantity: BIGINT
+- name: '"kvaede"."raw"."stores"'
+  columns:
+    store_id: TEXT
+    store_name: TEXT
+    city: TEXT
+- name: '"kvaede"."raw"."waste"'
+  columns:
+    waste_date: DATE
+    store_id: TEXT
+    ingredient_id: TEXT
+    quantity: DOUBLE
+    unit: TEXT
+    reason: TEXT

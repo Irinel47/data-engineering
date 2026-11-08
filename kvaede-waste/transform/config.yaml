@@ -1,0 +1,15 @@
+gateways:
+  motherduck:
+    connection:
+      type: motherduck
+      database: kvaede
+      token: {{ env_var('MOTHERDUCK_TOKEN', '') }}
+  local:  # same tables in a local file, for working offline
+    connection:
+      type: duckdb
+      database: ../data/kvaede.duckdb
+
+default_gateway: motherduck
+
+model_defaults:
+  dialect: duckdb

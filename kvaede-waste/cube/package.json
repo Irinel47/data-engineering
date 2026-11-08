@@ -1,0 +1,11 @@
+{
+  "name": "kvaede-cube",
+  "private": true,
+  "scripts": {
+    "dev": "cubejs-server"
+  },
+  "dependencies": {
+    "@cubejs-backend/duckdb-driver": "1.8.19",
+    "@cubejs-backend/server": "1.8.19"
+  }
+}

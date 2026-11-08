@@ -1,0 +1,2 @@
+duckdb==1.5.6
+sqlmesh[motherduck,lsp]==0.236.4
