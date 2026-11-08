@@ -56,29 +56,36 @@ Click any box to see where its data comes from (blue) and where it goes
 
 ## Run it
 
-Needs Python, Node.js and a free MotherDuck account. Commands are PowerShell, from this folder.
+Needs Python 3.10+, Node.js 22+ and a free [MotherDuck](https://motherduck.com) account.
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+git clone https://github.com/Irinel47/data-engineering.git
+cd data-engineering/kvaede-waste
+
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 
 python generate_data.py
-$env:MOTHERDUCK_TOKEN = "<your token>"
+$env:MOTHERDUCK_TOKEN = "<your token>"   # macOS/Linux: export MOTHERDUCK_TOKEN=...
 python load_to_motherduck.py
 
 cd transform
 sqlmesh test
 sqlmesh plan
 
-cd ..\cube
-npm install
-Copy-Item .env.example .env   # add your token
-npm run dev                   # keep it running
+cd ../cube
+npm ci
+cp .env.example .env                 # add your token
+npm run dev                          # keep it running
 
-# second terminal
+# second terminal, from kvaede-waste
 cd dashboard
-python -m http.server 8080    # http://localhost:8080
+python -m http.server 8080           # http://localhost:8080
 ```
+
+**Without MotherDuck** everything runs on a local DuckDB file: use
+`python load_to_motherduck.py --local` and `sqlmesh --gateway local plan`, and in
+`cube/.env` replace the token line with `CUBEJS_DB_DUCKDB_DATABASE_PATH=../data/kvaede.duckdb`.
 
 All names and figures are invented.
